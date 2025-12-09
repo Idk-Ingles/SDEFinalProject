@@ -1,0 +1,138 @@
+
+import java.awt.geom.Point2D;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.InputMismatchException;
+import java.util.List;
+import java.util.stream.Collectors;
+public class Game {
+    private static char[][] grid=new char[20][20];  
+    private ChristopherColumbusShip ship;
+    PirateFactory pirateFactory;
+    List<PirateShip>pirateShips;
+    WindContainer windContainer;
+    CreatureContainer monsters;
+    String winner;
+    public void updateGrid(int x,int y,char value){
+        grid[x][y]=value;
+    }
+    public Game(){         
+            pirateFactory = new PPirateShipFactory();
+            windContainer=new WindContainer();             
+            pirateShips = new ArrayList<>();
+            monsters = new CreatureContainer();
+            initializeGrid(); 
+    }
+    public boolean containsObject(int x,int y){
+        return grid[x][y]=='C'|| grid[x][y]=='P' || grid[x][y]=='Q'|| grid[x][y]=='I' || grid[x][y]=='W' || grid[x][y]=='T';
+    }
+    public List<PirateShip> getPirateShips()
+    {
+        return this.pirateShips;
+    }
+    public char[][] initializeGrid(){
+        grid=new char[20][20];
+        for(int i=0;i<grid.length;i++)Arrays.fill(grid[i],Character.MIN_VALUE);
+        return grid;
+    }
+    public void setWinner(String winner){
+        this.winner = winner;
+    }
+    public void setChristopherColumbusShip(ChristopherColumbusShip ship){
+        this.ship=ship;
+    }
+    public String getWinner(){
+        return winner;
+    }
+    public static char[][] getGrid(){        
+        return grid;
+    }
+    public ChristopherColumbusShip getChristopherColumbusShip(){
+        return ship;
+    }
+    public Game play(int keyEvent){
+        if(ship!=null&&winner==null){
+            if(keyEvent==37)ship.moveWest(this);
+        else if(keyEvent==38)ship.moveNorth(this);
+        else if(keyEvent==39)ship.moveEast(this);
+        else if(keyEvent==40)ship.moveSouth(this);
+        monsters.move(this);             
+        }
+        return this;
+    }      
+    public PirateShip addPirateShips(int xCoordinate,int yCoordinate,char type){        		
+            PirateShip pirateShip=null;
+            if(xCoordinate>19||xCoordinate<0||yCoordinate>19||yCoordinate<0||(type!='P'&&type!='Q'))
+            {
+                throw new InputMismatchException("Coordinates Index Out of Bounds");
+            }                
+            if(!containsObject(xCoordinate, yCoordinate))
+			{
+				grid[xCoordinate][yCoordinate] = type;		
+                pirateShip=pirateFactory.getNewPirateShip(xCoordinate, yCoordinate,type);	
+                ship.addObserver(pirateShip);
+                pirateShips.add(pirateShip);             
+			}  
+            return pirateShip;                          		 
+		}
+    public void addIslands(int xCoordinate,int yCoordinate){
+			//Before assigning Pirate ships, Make sure that location is not occupied by some other island/ship 
+			if(!containsObject(xCoordinate, yCoordinate))
+			{
+				grid[xCoordinate][yCoordinate] = 'I';
+			}
+    }
+    public void addMonsters(int xCoordinate,int yCoordinate)
+    {
+        if(!this.containsObject(xCoordinate, yCoordinate)&&xCoordinate>=16&&xCoordinate<=19&&yCoordinate>=8&&yCoordinate<=11&&grid[xCoordinate][yCoordinate]!='M')
+        {
+            monsters.addMonster(new Whale(xCoordinate,yCoordinate));
+            grid[xCoordinate][yCoordinate]='M';
+        }
+    }
+    public void addWind(int x,int y){
+        if(!containsObject(x,y)){
+            Wind wind = new Wind(x, y);
+            windContainer.addWhirlpool(wind);
+            grid[x][y]='W';
+        }
+    }
+    public Point2D newRandomLocation(int x,int y){
+        Point2D newLocation = windContainer.newRandomLocation(x, y);
+        int nx = (int)newLocation.getX();int ny=(int)newLocation.getY();
+        if(nx-1>=0&&!containsObject(nx-1, ny))nx--;
+        else if(nx+1<=19&&!containsObject(nx+1, ny))nx++;
+        else if(ny-1>=0&&!containsObject(nx, ny-1))ny--;
+        else if(ny+1<=19&&!containsObject(nx, ny+1))ny++;
+        System.out.println("new WhirlPool location: X: "+nx+", Y: "+ny);
+        return new Point2D.Float(nx,ny);
+    }
+    public boolean noObstacles(int x,int y){
+        return grid[x][y]!='I';
+    }
+    public void addChristopherColumbusShip(int xCoordinate,int yCoordinate){
+        if(ship==null)ship=new ChristopherColumbusShip(xCoordinate,yCoordinate);
+        grid[ship.getX()][ship.getY()] = 'C';
+    }
+    public Game createObject(int number, Character type){
+        int xCoordinate = number/20;int yCoordinate=number%20;
+        System.out.println("Called Create Object: X: "+xCoordinate+", Y: "+yCoordinate);
+        switch(type){
+            case 'C':addChristopherColumbusShip(xCoordinate,yCoordinate);break;
+            case 'P': addPirateShips(xCoordinate, yCoordinate,'P');break;
+            case 'Q': addPirateShips(xCoordinate, yCoordinate, 'Q');break;
+            case 'I': addIslands(xCoordinate,yCoordinate);break;
+            case 'W': addWind(xCoordinate, yCoordinate);break;
+            case 'M': addMonsters(xCoordinate,yCoordinate);break;
+            case 'T': grid[xCoordinate][yCoordinate]=type;break;
+            case 'S': grid[xCoordinate][yCoordinate]=type;break;
+        }
+        return this;
+    }
+    public void killPirateShip(int xCoordinate,int yCoordinate){
+        PirateShip pirate = pirateShips.stream().filter(p->(p.getPirateLocation().getX()==xCoordinate&&p.getPirateLocation().getY()==yCoordinate)).collect(Collectors.toList()).get(0);
+        ship.deleteObserver(pirate);
+        pirateShips.remove(pirate);
+        pirate=null;
+    }
+}
